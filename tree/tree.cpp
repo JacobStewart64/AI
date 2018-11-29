@@ -1,4 +1,4 @@
-#include "node.h"
+#include "Node.h"
 #include <iostream>
 #include <vector>
 
@@ -9,15 +9,15 @@ public:
     Data(int);
     ~Data();
 
-    int hi();
+    int hi() const;
 
-    int sig;
+    const int sig;
 };
 
-Data::Data(int _sig) : sig(_sig) {}
+Data::Data(const int _sig) : sig(_sig) {}
 Data::~Data() {}
 
-int Data::hi()
+int Data::hi() const
 {
     return sig;
 }
@@ -41,7 +41,7 @@ int main()
     Node<Data, Children>* dnode4 = new Node<Data, Children>(dnode3, Data(4));
     Node<Data, Children>* dnode5 = new Node<Data, Children>(dnode4, Data(5));
     Node<Data, Children>* dnode7 = new Node<Data, Children>(dnode5, Data(7));
-    dnode7->visit_to_root([](Data& d, Children& c) {
+    dnode7->visit_to_root([](const Data& d, const Children& c) {
         cout << d.hi() << endl;
     });
     return 0;

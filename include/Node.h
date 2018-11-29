@@ -14,8 +14,8 @@ public:
     Node(NODE*, T&&);
     ~Node();
 
-    NODE* root();
-    void visit_to_root(std::function<void(T&, C&)>);
+    NODE* root() const;
+    void visit_to_root(std::function<void(const T&, const C&)>) const;
 
     T data;
     C children;
@@ -33,7 +33,7 @@ NODE::~Node()
 {}
 
 NODETEMPLATE
-NODE* NODE::root()
+NODE* NODE::root() const
 {
     NODE* tmp = parent;
     while (tmp->parent != nullptr)
@@ -44,7 +44,7 @@ NODE* NODE::root()
 }
 
 NODETEMPLATE
-void NODE::visit_to_root(std::function<void(T&, C&)> visitor)
+void NODE::visit_to_root(std::function<void(const T&, const C&)> visitor) const
 {
     visitor(data, children);
 
@@ -59,3 +59,6 @@ void NODE::visit_to_root(std::function<void(T&, C&)> visitor)
     }
     visitor(tmp->data, tmp->children);
 }
+
+#undef NODETEMPLATE
+#undef NODE

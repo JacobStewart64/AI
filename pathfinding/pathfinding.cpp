@@ -1,4 +1,6 @@
-#include "node.h"
+#include "Node.h"
+#include "Point.h"
+#include "Representation.h"
 #include <iostream>
 #include <vector>
 #include <unordered_map>
@@ -8,40 +10,44 @@
 
 using namespace std;
 
-//a simple point
-class Point {
-public:
-    Point(float, float);
-    ~Point();
-    float x;
-    float y;
-};
-
-Point::Point(float _x, float _y)
-    : x(_x), y(_y)
-{}
-
-Point::~Point()
-{}
-
-
 //the data type for node template
 class NodeData {
 public:
-    NodeData(Point&, float);
+    NodeData(const Point<float>&, const float, const float);
     ~NodeData();
 
-    Point p;
-    float d;
+    const float total_cost() const;
+    const float x() const;
+    const float y() const;
+
+    const Point<float> p;
+    const float h;
+    const float c;
 };
 
-NodeData::NodeData(Point& _p, float _d)
+NodeData::NodeData(const Point<float>& _p, const float _h, const float _c)
     : p(_p)
-    , d(_d)
+    , h(_h)
+    , c(_c)
 {}
 
 NodeData::~NodeData()
 {}
+
+const float NodeData::total_cost() const
+{
+    return h + c;
+}
+
+const float NodeData::x() const
+{
+    return p.x;
+}
+
+const float NodeData::y() const
+{
+    return p.y;
+}
 
 
 //the children type for node template
@@ -50,12 +56,12 @@ public:
     NodeChildren();
     ~NodeChildren();
 
-    int child_index;
+    int index;
     vector<Node<NodeData, NodeChildren>*> cv;
 };
 
 NodeChildren::NodeChildren()
-    : child_index(0)
+    : index(0)
 {}
 
 NodeChildren::~NodeChildren()
@@ -65,43 +71,59 @@ NodeChildren::~NodeChildren()
 //all typedefs
 typedef Node<NodeData, NodeChildren> PathNode;
 typedef vector<vector<char>> InputMap;
-typedef vector<Point> Polygon;
+typedef vector<Point<float>> Polygon;
 typedef unordered_map<char, Polygon> PolygonMap;
 
+class RawPolyField {
+public:
+    RawPolyField(InputMap&);
+    ~RawPolyField();
 
-//function prototypes
-void log_input_map(InputMap&);
-void parse_input_map(InputMap&, PolygonMap&);
-float distance(Point&, Point&);
-bool PointInPolygon(Point, Polygon);
-bool float_equals(const float, const float, float = 0.05f);
-bool point_in_poly_test(const PolygonMap&, Point, Point);
-bool add_children_from_polygon(char, PolygonMap&, PathNode*);
-void add_all_children(PolygonMap&, PathNode*);
-void mark_input_map(InputMap&, PathNode*);
-PathNode* navigate_polygon_field(PolygonMap&);
+    InputMap& get_data();
 
+private:
+    InputMap input_map;
+};
 
+RawPolyField::RawPolyField(InputMap& _input_map)
+    : input_map(_input_map)
+{}
 
-//function implementations
-//get the points of the polygons out of the input map representation
-//into a map of polygons (char : array of Points)
-void parse_input_map(InputMap& im, PolygonMap& polygons)
+RawPolyField::~RawPolyField()
+{}
+
+InputMap& RawPolyField::get_data()
 {
-    for (int i = 0; i < im.size(); ++i)
+    return input_map;
+}
+
+class ParsedPolyField {
+public:
+    ParsedPolyField(RawPolyField&);
+    ~ParsedPolyField();
+
+    const PolygonMap& get_data() const;
+
+private:
+    PolygonMap poly_map;
+};
+
+ParsedPolyField::ParsedPolyField(RawPolyField& raw)
+{
+    for (int i = 0; i < raw.get_data().size(); ++i)
     {
-        for (int j = 0; j < im[i].size(); ++j)
+        for (int j = 0; j < raw.get_data()[i].size(); ++j)
         {
-            if (im[i][j] != ' ')
+            if (raw.get_data()[i][j] != ' ')
             {
-                if (polygons.find(im[i][j]) != polygons.end())
+                if (poly_map.find(raw.get_data()[i][j]) != poly_map.end())
                 {
-                    polygons.at(im[i][j]).push_back({i,j});
+                    poly_map.at(raw.get_data()[i][j]).push_back({i,j});
                 }
                 else
                 {
-                    Polygon new_poly{Point{i,j}};
-                    polygons.insert(pair<char, Polygon>(im[i][j], new_poly));
+                    Polygon new_poly{Point<float>{i,j}};
+                    poly_map.insert(pair<char, Polygon>(raw.get_data()[i][j], new_poly));
                 }
             }
         }
@@ -111,12 +133,12 @@ void parse_input_map(InputMap& im, PolygonMap& polygons)
     //only 4 pointed and 3 pointed allowed
     for (char c = 'a'; c < 'g'; ++c)
     {
-        if (polygons.find(c) != polygons.end())
+        if (poly_map.find(c) != poly_map.end())
         {
-            Polygon& poly = polygons.at(c);
+            Polygon& poly = poly_map.at(c);
             if (poly.size() == 4)
             {
-                Point tmp = poly[3];
+                Point<float> tmp = poly[3];
                 poly[3] = poly[2];
                 poly[2] = tmp;
             }
@@ -131,6 +153,23 @@ void parse_input_map(InputMap& im, PolygonMap& polygons)
         }
     }
 }
+
+ParsedPolyField::~ParsedPolyField()
+{}
+
+const PolygonMap& ParsedPolyField::get_data() const
+{
+    return poly_map;
+}
+
+typedef Representation<RawPolyField, ParsedPolyField> State;
+
+bool float_equals(const float, const float, const float = 0.05f);
+bool point_in_poly_test(const PolygonMap&, Point<float>, const Point<float>&);
+bool add_children_from_polygon(const char, const PolygonMap&, const PathNode*);
+void add_all_children(const PolygonMap&, PathNode*);
+void mark_input_map(InputMap&, const PathNode*);
+PathNode* navigate_polygon_field(const PolygonMap&);
 
 
 //log a polygon field (input object)
@@ -150,32 +189,16 @@ void log_input_map(InputMap& im)
 
 
 //mark the input map with 'p' for every goal_sequence node
-void mark_input_map(InputMap& im, PathNode* node)
+void mark_input_map(InputMap& im, const PathNode* node)
 {
-    node->visit_to_root([&im](NodeData& d, NodeChildren& c) {
+    node->visit_to_root([&im](const NodeData& d, const NodeChildren& c) {
         im[d.p.x][d.p.y] = 'p';
     });
 }
 
-//is the point in the polygon?
-bool PointInPolygon(Point point, Polygon polygon)
-{
-  int i, j, nvert = polygon.size();
-  bool c = false;
-
-  for(i = 0, j = nvert - 1; i < nvert; j = i++) {
-    if( ( (polygon[i].y >= point.y ) != (polygon[j].y >= point.y) ) &&
-        (point.x <= (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)
-      )
-      c = !c;
-  }
-
-  return c;
-}
-
 
 //very lenient float comparison for equality
-bool float_equals(const float val, const float val2, float epsilon)
+bool float_equals(const float val, const float val2, const float epsilon)
 {
     return val > (val2 - epsilon) && val < (val2 + epsilon);
 }
@@ -184,14 +207,14 @@ bool float_equals(const float val, const float val2, float epsilon)
 //the entire series of PointInPolygon checks that validate a potential
 //child node as a true child. Basically checks for collision into
 //polys denying a connection to and from the beg point and end point.
-bool point_in_poly_test(const PolygonMap& polygons, Point beg, Point end)
+bool point_in_poly_test(const PolygonMap& polygons, Point<float> beg, const Point<float>& end)
 {
-    Point delta((beg.x - end.x)*0.001f, (beg.y - end.y)*0.001f);
+    const Point<float> delta((beg.x - end.x)*0.001f, (beg.y - end.y)*0.001f);
     while (!float_equals(beg.x, end.x) && !float_equals(beg.y, end.y))
     {
         for (const pair<char, Polygon>& p : polygons)
         {   
-            if (PointInPolygon(beg, p.second))
+            if (beg.in_poly(p.second))
             {
                 return false;
             }
@@ -200,13 +223,6 @@ bool point_in_poly_test(const PolygonMap& polygons, Point beg, Point end)
         beg.y -= delta.y;
     }
     return true;
-}
-
-
-//distance between two points
-float distance(Point& beg, Point& end)
-{
-    return sqrt(pow(beg.x - end.x, 2) + pow(beg.y - end.y, 2));
 }
 
 
@@ -222,9 +238,9 @@ bool add_children_from_polygon(char c, PolygonMap& polygons, PathNode* node)
         {
             
             bool found = false;
-            node->visit_to_root([&c, &i, &found, &polygons](NodeData& d, NodeChildren& c) {
-                if (float_equals(d.p.x, polygons.at(c)[i].x) && 
-                    float_equals(d.p.y, polygons.at(c)[i].y))
+            node->visit_to_root([&c, &i, &found, &polygons](const NodeData& data, const NodeChildren& chldrn) {
+                if (float_equals(data.x(), polygons.at(c)[i].x) && 
+                    float_equals(data.y(), polygons.at(c)[i].y))
                 {
                     if (polygons.at(c).size() != 1)
                     {
@@ -245,12 +261,9 @@ bool add_children_from_polygon(char c, PolygonMap& polygons, PathNode* node)
                             node,
                             NodeData(
                                 polygons.at(c)[i],
-                                distance(
-                                    node->data.p,
-                                    polygons.at(c)[i]) +
-                                distance(
-                                    polygons.at(c)[i],
-                                    polygons['g'][0])));
+                                node->data.p.distance(polygons.at(c)[i]),
+                                polygons.at(c)[i].distance(polygons.at('g')[0])));
+
                     node->children.cv.push_back(new_node);
                 }
                 //if no pass poly test it cannot connect
@@ -276,26 +289,30 @@ void add_all_children(PolygonMap& polygons, PathNode* node)
     add_children_from_polygon('g', polygons, node);
 
     //sort the node vec
-    sort(node->children.cv.begin(), node->children.cv.end(), [](const PathNode* lh, const PathNode* rh)->bool {
-        return lh->data.d < rh->data.d;
-    });
+    sort(
+        node->children.cv.begin(),
+        node->children.cv.end(),
+        [](const PathNode* lh, const PathNode* rh)->bool {
+            return lh->data.total_cost() < rh->data.total_cost();
+        });
 }
 
 
 //returns a list of nodes from goal to start
 //that is the shortest path to the goal from the start
-PathNode* navigate_polygon_field(InputMap& polygon_field)
+PathNode* navigate_polygon_field(State& polygon_field)
 {
 
-    PolygonMap polygons;
-    parse_input_map(polygon_field, polygons);
 
-    Point goal = polygons['g'][0];
+    auto polygons = polygon_field.get_parsed_data();
+
+    Point<float> goal = polygons['g'][0];
 
     PathNode* current = new PathNode(
         nullptr,
         NodeData(
             polygons['s'][0],
+            99999999999,
             99999999999));
 
     int depth = 0;
@@ -305,7 +322,7 @@ PathNode* navigate_polygon_field(InputMap& polygon_field)
         {
             add_all_children(polygons, current);
         }
-        else if (current->children.child_index >= current->children.cv.size())
+        else if (current->children.index >= current->children.cv.size())
         {
             if (current->parent != nullptr)
             {
@@ -320,12 +337,14 @@ PathNode* navigate_polygon_field(InputMap& polygon_field)
 
         if (current->children.cv.size() > 0)
         {
-            if (current->parent && current->parent->children.child_index < current->parent->children.cv.size())
+            if (current->parent && current->parent->children.index <
+                current->parent->children.cv.size())
             {
-                if (current->children.cv[current->children.child_index]->data.d < current->parent->children.cv[current->parent->children.child_index]->data.d)
+                if (current->children.cv[current->children.index]->data.total_cost() <
+                    current->parent->children.cv[current->parent->children.index]->data.total_cost())
                 {
-                    PathNode* tmp = current->children.cv[current->children.child_index];
-                    ++current->children.child_index;
+                    PathNode* tmp = current->children.cv[current->children.index];
+                    ++current->children.index;
                     ++depth;
                     current = tmp;
                 }
@@ -344,8 +363,8 @@ PathNode* navigate_polygon_field(InputMap& polygon_field)
             }
             else
             {
-                PathNode* tmp = current->children.cv[current->children.child_index];
-                ++current->children.child_index;
+                PathNode* tmp = current->children.cv[current->children.index];
+                ++current->children.index;
                 ++depth;
                 current = tmp;
             }
@@ -363,7 +382,8 @@ PathNode* navigate_polygon_field(InputMap& polygon_field)
             }
         }
 
-        if (float_equals(current->data.p.x, goal.x) && float_equals(current->data.p.y, goal.y))
+        if (float_equals(current->data.x(), goal.x) &&
+            float_equals(current->data.y(), goal.y))
         {
             break;
         }
@@ -507,17 +527,14 @@ InputMap polygon_field2 = {{' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',
 
 int main()
 {
-    PathNode* goal_sequence0 = navigate_polygon_field(polygon_field0);
-    mark_input_map(polygon_field0, goal_sequence0);
-    log_input_map(polygon_field0);
-
-    PathNode* goal_sequence1 = navigate_polygon_field(polygon_field1);
-    mark_input_map(polygon_field1, goal_sequence1);
-    log_input_map(polygon_field1);
-
-    PathNode* goal_sequence2 = navigate_polygon_field(polygon_field2);
-    mark_input_map(polygon_field2, goal_sequence2);
-    log_input_map(polygon_field2);
+    vector<State> states = { State{polygon_field0}, State{polygon_field1}, State{polygon_field2} };
+    for (State& s : states)
+    {
+        PathNode* goal_sequence0 = navigate_polygon_field(s);
+        auto m = s.get_raw_data();
+        mark_input_map(m, goal_sequence0);
+        log_input_map(m);
+    }
 
     return 0;
 }
